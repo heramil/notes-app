@@ -1,7 +1,6 @@
 .git
 node_modules
-vendor/*  # Composer will reinstall inside the image
+.env
 storage/logs/*
 storage/framework/cache/*
 storage/framework/sessions/*
-.env

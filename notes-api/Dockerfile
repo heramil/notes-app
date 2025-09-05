@@ -1,23 +1,26 @@
-# ---- PHP runtime with Composer and PostgreSQL driver ----
+# ---- PHP 8.3 with Composer and needed PHP extensions ----
 FROM php:8.3-cli
 
-# System deps + pdo_pgsql
+# System deps + PHP extensions
 RUN apt-get update \
- && apt-get install -y git unzip libpq-dev \
- && docker-php-ext-install pdo_pgsql
+ && apt-get install -y git unzip libpq-dev libzip-dev \
+ && docker-php-ext-install pdo_pgsql mbstring zip
 
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
+
+# Install PHP deps first (better layer caching)
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --prefer-dist --no-interaction --no-progress
+
+# Now copy the rest of the app
 COPY . /app
 
-# Install PHP deps and cache configs
-RUN composer install --no-dev --optimize-autoloader \
- && php artisan config:cache && php artisan route:cache && php artisan view:cache
+# Ensure Laravel can write caches/logs
+RUN mkdir -p storage/framework/{cache,sessions,views} \
+ && chmod -R 775 storage bootstrap/cache
 
-# Expose port (Render injects $PORT, php -S will bind to it in CMD)
-EXPOSE 10000
-
-# Start the PHP built-in server
+# Start PHP’s built-in server; Render injects $PORT
 CMD ["sh", "-lc", "php -S 0.0.0.0:$PORT -t public"]
